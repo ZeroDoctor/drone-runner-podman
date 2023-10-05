@@ -5,114 +5,117 @@
 package engine
 
 import (
+	"io/fs"
+	"net"
 	"strings"
 
-	"github.com/docker/docker/api/types/container"
+	"github.com/containers/common/libnetwork/types"
+	"github.com/containers/podman/v4/pkg/specgen"
 	"github.com/docker/docker/api/types/mount"
-	"github.com/docker/docker/api/types/network"
+	"github.com/opencontainers/runtime-spec/specs-go"
+	"github.com/sirupsen/logrus"
 )
 
-// returns a container configuration.
-func toConfig(spec *Spec, step *Step) *container.Config {
-	config := &container.Config{
-		Image:        step.Image,
+func toSpec(spec *Spec, step *Step) *specgen.SpecGenerator {
+	basic := specgen.ContainerBasicConfig{
+		Name:         step.ID,
+		RawImageName: step.Image,
 		Labels:       step.Labels,
-		WorkingDir:   step.WorkingDir,
-		User:         step.User,
-		AttachStdin:  false,
-		AttachStdout: true,
-		AttachStderr: true,
-		Tty:          false,
-		OpenStdin:    false,
-		StdinOnce:    false,
-		ArgsEscaped:  false,
+		Env:          step.Envs,
+		Entrypoint:   step.Entrypoint,
+		Command:      step.Command,
+		Stdin:        false,
+		Terminal:     false,
 	}
 
-	if len(step.Envs) != 0 {
-		config.Env = toEnv(step.Envs)
-	}
 	for _, sec := range step.Secrets {
-		config.Env = append(config.Env, sec.Env+"="+string(sec.Data))
+		basic.EnvSecrets[sec.Env] = string(sec.Data)
 	}
 
-	if len(step.Entrypoint) != 0 {
-		config.Entrypoint = step.Entrypoint
+	volume := specgen.ContainerStorageConfig{
+		Image:   step.Image,
+		WorkDir: step.WorkingDir,
+		ShmSize: toPtr(step.ShmSize),
 	}
-	if len(step.Command) != 0 {
-		config.Cmd = step.Command
+
+	volumeSet := toVolumeSet(spec, step)
+	for path := range volumeSet {
+		volume.Volumes = append(volume.Volumes, &specgen.NamedVolume{
+			Dest: path,
+		})
 	}
+
 	if len(step.Volumes) != 0 {
-		config.Volumes = toVolumeSet(spec, step)
+		volume.Devices = toLinuxDeviceSlice(spec, step)
+		volume.Mounts = toLinuxVolumeMounts(spec, step)
 	}
-	return config
-}
 
-// returns a container host configuration.
-func toHostConfig(spec *Spec, step *Step) *container.HostConfig {
-	config := &container.HostConfig{
-		LogConfig: container.LogConfig{
-			Type: "json-file",
-		},
+	security := specgen.ContainerSecurityConfig{
+		User:       step.User,
 		Privileged: step.Privileged,
-		ShmSize:    step.ShmSize,
 	}
-	// windows does not support privileged so we hard-code
-	// this value to false.
+
+	// windows does not support privileged so we hard-code this value to false.
+	// podman doesn't even support windows so this would be a problem
+	// if we reach here
 	if spec.Platform.OS == "windows" {
-		config.Privileged = false
+		security.Privileged = false
 	}
+
+	var dns []net.IP
+	for i := range step.DNS {
+		ip, _, err := net.ParseCIDR(step.DNS[i])
+		if err != nil {
+			logrus.Warnf("failed to parse dns [ip=%s] [error=%s]", step.DNS[i], err.Error())
+			continue
+		}
+		dns = append(dns, ip)
+	}
+
+	net := specgen.ContainerNetworkConfig{
+		DNSServers: dns,
+		DNSSearch:  step.DNSSearch,
+		HostAdd:    step.ExtraHosts,
+	}
+
 	if len(step.Network) > 0 {
-		config.NetworkMode = container.NetworkMode(step.Network)
+		net.Networks = make(map[string]types.PerNetworkOptions)
+		net.Networks[step.Network] = types.PerNetworkOptions{}
 	}
-	if len(step.DNS) > 0 {
-		config.DNS = step.DNS
-	}
-	if len(step.DNSSearch) > 0 {
-		config.DNSSearch = step.DNSSearch
-	}
-	if len(step.ExtraHosts) > 0 {
-		config.ExtraHosts = step.ExtraHosts
-	}
+
+	resource := specgen.ContainerResourceConfig{}
 	if isUnlimited(step) == false {
-		config.Resources = container.Resources{
-			CPUPeriod:  step.CPUPeriod,
-			CPUQuota:   step.CPUQuota,
-			CpusetCpus: strings.Join(step.CPUSet, ","),
-			CPUShares:  step.CPUShares,
-			Memory:     step.MemLimit,
-			MemorySwap: step.MemSwapLimit,
+		resource = specgen.ContainerResourceConfig{
+			CPUPeriod: uint64(step.CPUPeriod),
+			CPUQuota:  step.CPUQuota,
+			ResourceLimits: &specs.LinuxResources{
+				CPU: &specs.LinuxCPU{
+					Cpus:   strings.Join(step.CPUSet, ","),
+					Shares: toPtr(uint64(step.CPUShares)),
+				},
+				Memory: &specs.LinuxMemory{
+					Limit: &step.MemLimit,
+					Swap:  &step.MemSwapLimit,
+				},
+			},
 		}
 	}
 
-	if len(step.Volumes) != 0 {
-		config.Devices = toDeviceSlice(spec, step)
-		config.Binds = toVolumeSlice(spec, step)
-		config.Mounts = toVolumeMounts(spec, step)
+	config := &specgen.SpecGenerator{
+		ContainerBasicConfig:    basic,
+		ContainerStorageConfig:  volume,
+		ContainerSecurityConfig: security,
+		ContainerNetworkConfig:  net,
+		ContainerResourceConfig: resource,
 	}
-	return config
-}
 
-// helper function returns the container network configuration.
-func toNetConfig(spec *Spec, proc *Step) *network.NetworkingConfig {
-	// if the user overrides the default network we do not
-	// attach to the user-defined network.
-	if proc.Network != "" {
-		return &network.NetworkingConfig{}
-	}
-	endpoints := map[string]*network.EndpointSettings{}
-	endpoints[spec.Network.ID] = &network.EndpointSettings{
-		NetworkID: spec.Network.ID,
-		Aliases:   []string{proc.Name},
-	}
-	return &network.NetworkingConfig{
-		EndpointsConfig: endpoints,
-	}
+	return config
 }
 
 // helper function that converts a slice of device paths to a slice of
 // container.DeviceMapping.
-func toDeviceSlice(spec *Spec, step *Step) []container.DeviceMapping {
-	var to []container.DeviceMapping
+func toLinuxDeviceSlice(spec *Spec, step *Step) []specs.LinuxDevice {
+	var to []specs.LinuxDevice
 	for _, mount := range step.Devices {
 		device, ok := lookupVolume(spec, mount.Name)
 		if !ok {
@@ -121,10 +124,13 @@ func toDeviceSlice(spec *Spec, step *Step) []container.DeviceMapping {
 		if isDevice(device) == false {
 			continue
 		}
-		to = append(to, container.DeviceMapping{
-			PathOnHost:        device.HostPath.Path,
-			PathInContainer:   mount.DevicePath,
-			CgroupPermissions: "rwm",
+		to = append(to, specs.LinuxDevice{
+			// NOTE: there only host path... weird
+			Path: device.HostPath.Path,
+
+			// PathOnHost:      device.HostPath.Path,
+			// PathInContainer: mount.DevicePath,
+			FileMode: toPtr(fs.ModePerm),
 		})
 	}
 	if len(to) == 0 {
@@ -184,8 +190,8 @@ func toVolumeSlice(spec *Spec, step *Step) []string {
 
 // helper function returns a slice of docker mount
 // configurations.
-func toVolumeMounts(spec *Spec, step *Step) []mount.Mount {
-	var mounts []mount.Mount
+func toLinuxVolumeMounts(spec *Spec, step *Step) []specs.Mount {
+	var mounts []specs.Mount
 	for _, target := range step.Volumes {
 		source, ok := lookupVolume(spec, target.Name)
 		if !ok {
@@ -203,7 +209,7 @@ func toVolumeMounts(spec *Spec, step *Step) []mount.Mount {
 		if isDataVolume(source) {
 			continue
 		}
-		mounts = append(mounts, toMount(source, target))
+		mounts = append(mounts, toLinuxMount(source, target))
 	}
 	if len(mounts) == 0 {
 		return nil
@@ -213,21 +219,30 @@ func toVolumeMounts(spec *Spec, step *Step) []mount.Mount {
 
 // helper function converts the volume declaration to a
 // docker mount structure.
-func toMount(source *Volume, target *VolumeMount) mount.Mount {
-	to := mount.Mount{
-		Target: target.Path,
-		Type:   toVolumeType(source),
+func toLinuxMount(source *Volume, target *VolumeMount) specs.Mount {
+	to := specs.Mount{
+		Destination: target.Path,
+		Type:        string(toVolumeType(source)),
 	}
 	if isBindMount(source) || isNamedPipe(source) {
 		to.Source = source.HostPath.Path
-		to.ReadOnly = source.HostPath.ReadOnly
-	}
-	if isTempfs(source) {
-		to.TmpfsOptions = &mount.TmpfsOptions{
-			SizeBytes: source.EmptyDir.SizeLimit,
-			Mode:      0700,
+		if source.HostPath.ReadOnly {
+			// options defaults = rw, suid, dev, exec, auto, nouser, and async
+			to.Options = append(to.Options, "ro")
 		}
+		// to.ReadOnly = source.HostPath.ReadOnly
 	}
+
+	if isTempfs(source) {
+		// NOTE: not sure if this is translatable
+		//  probably part of resource struct
+
+		// to.TmpfsOptions = &mount.TmpfsOptions{
+		// 	SizeBytes: source.EmptyDir.SizeLimit,
+		// 	Mode:      0700,
+		// }
+	}
+
 	return to
 }
 

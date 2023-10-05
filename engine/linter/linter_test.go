@@ -8,7 +8,7 @@ import (
 	"path"
 	"testing"
 
-	"github.com/drone-runners/drone-runner-docker/engine/resource"
+	"github.com/drone-runners/drone-runner-podman/engine/resource"
 	"github.com/drone/drone-go/drone"
 	"github.com/drone/runner-go/manifest"
 )
@@ -47,7 +47,7 @@ func TestLint(t *testing.T) {
 			path:    "testdata/pipeline_volume_invalid_name.yml",
 			trusted: false,
 			invalid: true,
-			message: "linter: invalid volume name: _docker_socket",
+			message: "linter: invalid volume name: _podman_socket",
 		},
 		// user should not be trying to mount internal or restricted
 		// volume paths.

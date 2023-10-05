@@ -8,7 +8,7 @@ import (
 	"context"
 	"os"
 
-	"github.com/drone-runners/drone-runner-docker/command/daemon"
+	"github.com/drone-runners/drone-runner-podman/command/daemon"
 
 	"gopkg.in/alecthomas/kingpin.v2"
 )
@@ -22,7 +22,7 @@ var nocontext = context.Background()
 // Command parses the command line arguments and then executes a
 // subcommand program.
 func Command() {
-	app := kingpin.New("drone", "drone docker runner")
+	app := kingpin.New("drone", "drone podman runner")
 	registerCompile(app)
 	registerExec(app)
 	registerCopy(app)

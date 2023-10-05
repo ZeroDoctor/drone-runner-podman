@@ -32,7 +32,7 @@ func TestParse(t *testing.T) {
 		},
 		&Pipeline{
 			Kind:    "pipeline",
-			Type:    "docker",
+			Type:    "podman",
 			Name:    "default",
 			Version: "1",
 			Environment: map[string]string{
@@ -48,8 +48,8 @@ func TestParse(t *testing.T) {
 			Clone: manifest.Clone{
 				Depth: 50,
 			},
-			Deps: []string{"dependency"},
-			PullSecrets: []string{"dockerconfigjson"},
+			Deps:        []string{"dependency"},
+			PullSecrets: []string{"podmanconfigjson"},
 			Trigger: manifest.Conditions{
 				Branch: manifest.Condition{
 					Include: []string{"master"},
@@ -130,7 +130,7 @@ func TestParseNoMatch(t *testing.T) {
 func TestMatch(t *testing.T) {
 	r := &manifest.RawResource{
 		Kind: "pipeline",
-		Type: "docker",
+		Type: "podman",
 	}
 	if match(r) == false {
 		t.Errorf("Expect match, got false")
@@ -138,7 +138,7 @@ func TestMatch(t *testing.T) {
 
 	r = &manifest.RawResource{
 		Kind: "approval",
-		Type: "docker",
+		Type: "podman",
 	}
 	if match(r) == true {
 		t.Errorf("Expect kind mismatch, got true")

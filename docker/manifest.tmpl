@@ -1,4 +1,4 @@
-image: drone/drone-runner-docker:{{#if build.tag}}{{trimPrefix "v" build.tag}}{{else}}latest{{/if}}
+image: drone/drone-runner-podman:{{#if build.tag}}{{trimPrefix "v" build.tag}}{{else}}latest{{/if}}
 {{#if build.tags}}
 tags:
 {{#each build.tags}}
@@ -7,29 +7,29 @@ tags:
 {{/if}}
 manifests:
   -
-    image: drone/drone-runner-docker:{{#if build.tag}}{{trimPrefix "v" build.tag}}-{{/if}}linux-amd64
+    image: drone/drone-runner-podman:{{#if build.tag}}{{trimPrefix "v" build.tag}}-{{/if}}linux-amd64
     platform:
       architecture: amd64
       os: linux
   -
-    image: drone/drone-runner-docker:{{#if build.tag}}{{trimPrefix "v" build.tag}}-{{/if}}linux-arm64
+    image: drone/drone-runner-podman:{{#if build.tag}}{{trimPrefix "v" build.tag}}-{{/if}}linux-arm64
     platform:
       variant: v8
       architecture: arm64
       os: linux
   -
-    image: drone/drone-runner-docker:{{#if build.tag}}{{trimPrefix "v" build.tag}}-{{/if}}linux-ppc64le
+    image: drone/drone-runner-podman:{{#if build.tag}}{{trimPrefix "v" build.tag}}-{{/if}}linux-ppc64le
     platform:
       architecture: ppc64le
       os: linux
   -
-    image: drone/drone-runner-docker:{{#if build.tag}}{{trimPrefix "v" build.tag}}-{{/if}}windows-1809-amd64
+    image: drone/drone-runner-podman:{{#if build.tag}}{{trimPrefix "v" build.tag}}-{{/if}}windows-1809-amd64
     platform:
       architecture: amd64
       os: windows
       version: 1809
   -
-    image: drone/drone-runner-docker:{{#if build.tag}}{{trimPrefix "v" build.tag}}-{{/if}}windows-ltsc2022-amd64
+    image: drone/drone-runner-podman:{{#if build.tag}}{{trimPrefix "v" build.tag}}-{{/if}}windows-ltsc2022-amd64
     platform:
       architecture: amd64
       os: windows

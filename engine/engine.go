@@ -5,64 +5,57 @@
 package engine
 
 import (
+	"bytes"
 	"context"
 	"io"
-	"io/ioutil"
 	"os"
 	"time"
 
-	"github.com/drone-runners/drone-runner-docker/internal/docker/errors"
-	"github.com/drone-runners/drone-runner-docker/internal/docker/image"
-	"github.com/drone-runners/drone-runner-docker/internal/docker/jsonmessage"
-	"github.com/drone-runners/drone-runner-docker/internal/docker/stdcopy"
+	"github.com/drone-runners/drone-runner-podman/internal/podman/errors"
+	"github.com/drone-runners/drone-runner-podman/internal/podman/image"
+	"github.com/drone-runners/drone-runner-podman/internal/podman/jsonmessage"
+	"github.com/drone-runners/drone-runner-podman/internal/podman/stdcopy"
 	"github.com/drone/runner-go/logger"
 	"github.com/drone/runner-go/pipeline/runtime"
-	"github.com/drone/runner-go/registry/auths"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/api/types/volume"
-	"github.com/docker/docker/client"
-	"github.com/docker/docker/errdefs"
+	"github.com/containers/common/libnetwork/types"
+	"github.com/containers/podman/v4/pkg/bindings"
+	"github.com/containers/podman/v4/pkg/bindings/containers"
+	"github.com/containers/podman/v4/pkg/bindings/images"
+	"github.com/containers/podman/v4/pkg/bindings/network"
+	"github.com/containers/podman/v4/pkg/bindings/volumes"
+	"github.com/containers/podman/v4/pkg/domain/entities"
 )
+
+// TODO: figure out what to do about this global
+const UNIX_SOCK string = "unix:///run/podman/podman.sock"
 
 // Opts configures the Docker engine.
 type Opts struct {
 	HidePull bool
 }
 
-// Docker implements a Docker pipeline engine.
-type Docker struct {
-	client   client.APIClient
+// Podman implements a Podman pipeline engine.
+type Podman struct {
 	hidePull bool
+	conn     context.Context
 }
 
 // New returns a new engine.
-func New(client client.APIClient, opts Opts) *Docker {
-	return &Docker{
-		client:   client,
+func New(conn context.Context, opts Opts) *Podman {
+	return &Podman{
 		hidePull: opts.HidePull,
 	}
 }
 
 // NewEnv returns a new Engine from the environment.
-func NewEnv(opts Opts) (*Docker, error) {
-	cli, err := client.NewClientWithOpts(client.FromEnv)
-	if err != nil {
-		return nil, err
-	}
-	return New(cli, opts), nil
-}
-
-// Ping pings the Docker daemon.
-func (e *Docker) Ping(ctx context.Context) error {
-	_, err := e.client.Ping(ctx)
-	return err
+func NewEnv(ctx context.Context, opts Opts) (*Podman, error) {
+	conn, err := bindings.NewConnection(ctx, UNIX_SOCK)
+	return New(conn, opts), err
 }
 
 // Setup the pipeline environment.
-func (e *Docker) Setup(ctx context.Context, specv runtime.Spec) error {
+func (e *Podman) Setup(ctx context.Context, specv runtime.Spec) error {
 	spec := specv.(*Spec)
 
 	// creates the default temporary (local) volumes
@@ -71,11 +64,16 @@ func (e *Docker) Setup(ctx context.Context, specv runtime.Spec) error {
 		if vol.EmptyDir == nil {
 			continue
 		}
-		_, err := e.client.VolumeCreate(ctx, volume.VolumeCreateBody{
-			Name:   vol.EmptyDir.ID,
-			Driver: "local",
-			Labels: vol.EmptyDir.Labels,
-		})
+
+		_, err := volumes.Create(
+			e.conn,
+			entities.VolumeCreateOptions{
+				Name:   vol.EmptyDir.ID,
+				Driver: "local",
+				Label:  vol.EmptyDir.Labels,
+			},
+			&volumes.CreateOptions{},
+		)
 		if err != nil {
 			return errors.TrimExtraInfo(err)
 		}
@@ -87,7 +85,9 @@ func (e *Docker) Setup(ctx context.Context, specv runtime.Spec) error {
 	if spec.Platform.OS == "windows" {
 		driver = "nat"
 	}
-	_, err := e.client.NetworkCreate(ctx, spec.Network.ID, types.NetworkCreate{
+
+	_, err := network.Create(e.conn, &types.Network{
+		ID:      spec.Network.ID,
 		Driver:  driver,
 		Options: spec.Network.Options,
 		Labels:  spec.Network.Labels,
@@ -95,7 +95,7 @@ func (e *Docker) Setup(ctx context.Context, specv runtime.Spec) error {
 
 	// launches the inernal setup steps
 	for _, step := range spec.Internal {
-		if err := e.create(ctx, spec, step, ioutil.Discard); err != nil {
+		if err := e.create(ctx, spec, step, io.Discard); err != nil {
 			logger.FromContext(ctx).
 				WithError(err).
 				WithField("container", step.ID).
@@ -126,18 +126,19 @@ func (e *Docker) Setup(ctx context.Context, specv runtime.Spec) error {
 }
 
 // Destroy the pipeline environment.
-func (e *Docker) Destroy(ctx context.Context, specv runtime.Spec) error {
+func (e *Podman) Destroy(ctx context.Context, specv runtime.Spec) error {
 	spec := specv.(*Spec)
 
-	removeOpts := types.ContainerRemoveOptions{
-		Force:         true,
-		RemoveLinks:   false,
-		RemoveVolumes: true,
+	removeOpts := containers.RemoveOptions{
+		Force:   toPtr(true),
+		Volumes: toPtr(true),
+		Depend:  toPtr(true), // maybe?
+		Ignore:  toPtr(true),
 	}
 
 	// stop all containers
 	for _, step := range append(spec.Steps, spec.Internal...) {
-		if err := e.client.ContainerKill(ctx, step.ID, "9"); err != nil && !client.IsErrNotFound(err) && !errdefs.IsConflict(err) {
+		if err := containers.Kill(ctx, step.ID, &containers.KillOptions{Signal: toPtr("9")}); err != nil {
 			logger.FromContext(ctx).
 				WithError(err).
 				WithField("container", step.ID).
@@ -147,7 +148,7 @@ func (e *Docker) Destroy(ctx context.Context, specv runtime.Spec) error {
 
 	// cleanup all containers
 	for _, step := range append(spec.Steps, spec.Internal...) {
-		if err := e.client.ContainerRemove(ctx, step.ID, removeOpts); err != nil && !client.IsErrNotFound(err) {
+		if _, err := containers.Remove(e.conn, step.ID, &removeOpts); err != nil {
 			logger.FromContext(ctx).
 				WithError(err).
 				WithField("container", step.ID).
@@ -165,7 +166,8 @@ func (e *Docker) Destroy(ctx context.Context, specv runtime.Spec) error {
 		if vol.EmptyDir.Medium == "memory" {
 			continue
 		}
-		if err := e.client.VolumeRemove(ctx, vol.EmptyDir.ID, true); err != nil {
+
+		if err := volumes.Remove(e.conn, vol.EmptyDir.ID, &volumes.RemoveOptions{Force: toPtr(true)}); err != nil {
 			logger.FromContext(ctx).
 				WithError(err).
 				WithField("volume", vol.EmptyDir.ID).
@@ -173,8 +175,7 @@ func (e *Docker) Destroy(ctx context.Context, specv runtime.Spec) error {
 		}
 	}
 
-	// cleanup the network
-	if err := e.client.NetworkRemove(ctx, spec.Network.ID); err != nil {
+	if _, err := network.Remove(e.conn, spec.Network.ID, &network.RemoveOptions{}); err != nil {
 		logger.FromContext(ctx).
 			WithError(err).
 			WithField("network", spec.Network.ID).
@@ -189,7 +190,7 @@ func (e *Docker) Destroy(ctx context.Context, specv runtime.Spec) error {
 }
 
 // Run runs the pipeline step.
-func (e *Docker) Run(ctx context.Context, specv runtime.Spec, stepv runtime.Step, output io.Writer) (*runtime.State, error) {
+func (e *Podman) Run(ctx context.Context, specv runtime.Spec, stepv runtime.Step, output io.Writer) (*runtime.State, error) {
 	spec := specv.(*Spec)
 	step := stepv.(*Step)
 
@@ -209,7 +210,7 @@ func (e *Docker) Run(ctx context.Context, specv runtime.Spec, stepv runtime.Step
 		// tail the container
 		logger.FromContext(ctx).
 			WithField("step id", step.ID).
-			Debugln("using deferred docker tail")
+			Debugln("using deferred podman tail")
 		logs, tailErr := e.deferTail(ctx, step.ID, output)
 		if tailErr != nil {
 			return nil, errors.TrimExtraInfo(tailErr)
@@ -229,64 +230,52 @@ func (e *Docker) Run(ctx context.Context, specv runtime.Spec, stepv runtime.Step
 // emulate docker commands
 //
 
-func (e *Docker) create(ctx context.Context, spec *Spec, step *Step, output io.Writer) error {
+func (e *Podman) create(ctx context.Context, spec *Spec, step *Step, output io.Writer) error {
 	// create pull options with encoded authorization credentials.
-	pullopts := types.ImagePullOptions{}
+	pullopts := images.PullOptions{}
 	if step.Auth != nil {
-		pullopts.RegistryAuth = auths.Header(
-			step.Auth.Username,
-			step.Auth.Password,
-		)
+		pullopts.Username = &step.Auth.Username
+		pullopts.Password = &step.Auth.Password
 	}
 
+	// Read(p []byte) (n int, err error)
 	// automatically pull the latest version of the image if requested
 	// by the process configuration, or if the image is :latest
 	if step.Pull == PullAlways ||
 		(step.Pull == PullDefault && image.IsLatest(step.Image)) {
-		rc, pullerr := e.client.ImagePull(ctx, step.Image, pullopts)
+		rc, pullerr := images.Pull(e.conn, step.Image, &pullopts)
 		if pullerr == nil {
+			b := bytes.NewBuffer(flattenToBytes(rc))
 			if e.hidePull {
-				io.Copy(ioutil.Discard, rc)
-			} else {
-				jsonmessage.Copy(rc, output)
+				io.Copy(io.Discard, b)
 			}
-			rc.Close()
+
+			jsonmessage.Copy(b, output)
 		}
 		if pullerr != nil {
 			return pullerr
 		}
 	}
 
-	_, err := e.client.ContainerCreate(ctx,
-		toConfig(spec, step),
-		toHostConfig(spec, step),
-		toNetConfig(spec, step),
-		step.ID,
-	)
+	_, err := containers.CreateWithSpec(e.conn, toSpec(spec, step), &containers.CreateOptions{})
 
 	// automatically pull and try to re-create the image if the
 	// failure is caused because the image does not exist.
-	if client.IsErrNotFound(err) && step.Pull != PullNever {
-		rc, pullerr := e.client.ImagePull(ctx, step.Image, pullopts)
+	if step.Pull != PullNever {
+		rc, pullerr := images.Pull(e.conn, step.Image, &pullopts)
 		if pullerr != nil {
 			return pullerr
 		}
 
+		b := bytes.NewBuffer(flattenToBytes(rc))
 		if e.hidePull {
-			io.Copy(ioutil.Discard, rc)
-		} else {
-			jsonmessage.Copy(rc, output)
+			io.Copy(io.Discard, b)
 		}
-		rc.Close()
+		jsonmessage.Copy(b, output)
 
 		// once the image is successfully pulled we attempt to
 		// re-create the container.
-		_, err = e.client.ContainerCreate(ctx,
-			toConfig(spec, step),
-			toHostConfig(spec, step),
-			toNetConfig(spec, step),
-			step.ID,
-		)
+		_, err = containers.CreateWithSpec(e.conn, toSpec(spec, step), &containers.CreateOptions{})
 	}
 	if err != nil {
 		return err
@@ -296,7 +285,7 @@ func (e *Docker) create(ctx context.Context, spec *Spec, step *Step, output io.W
 	// primarily used to attach global user-defined networks.
 	if step.Network == "" {
 		for _, net := range step.Networks {
-			err = e.client.NetworkConnect(ctx, net, step.ID, &network.EndpointSettings{
+			err = network.Connect(e.conn, net, step.ID, &types.PerNetworkOptions{
 				Aliases: []string{net},
 			})
 			if err != nil {
@@ -309,13 +298,13 @@ func (e *Docker) create(ctx context.Context, spec *Spec, step *Step, output io.W
 }
 
 // helper function emulates the `docker start` command.
-func (e *Docker) start(ctx context.Context, id string) error {
-	return e.client.ContainerStart(ctx, id, types.ContainerStartOptions{})
+func (e *Podman) start(ctx context.Context, id string) error {
+	return containers.Start(e.conn, id, &containers.StartOptions{})
 }
 
 // helper function emulates the `docker wait` command, blocking
 // until the container stops and returning the exit code.
-func (e *Docker) waitRetry(ctx context.Context, id string) (*runtime.State, error) {
+func (e *Podman) waitRetry(ctx context.Context, id string) (*runtime.State, error) {
 	for {
 		// if the context is canceled, meaning the
 		// pipeline timed out or was killed by the
@@ -332,42 +321,42 @@ func (e *Docker) waitRetry(ctx context.Context, id string) (*runtime.State, erro
 		}
 		logger.FromContext(ctx).
 			WithField("container", id).
-			Trace("docker wait exited unexpectedly")
+			Trace("podman wait exited unexpectedly")
 	}
 }
 
 // helper function emulates the `docker wait` command, blocking
 // until the container stops and returning the exit code.
-func (e *Docker) wait(ctx context.Context, id string) (*runtime.State, error) {
-	wait, errc := e.client.ContainerWait(ctx, id, container.WaitConditionNotRunning)
-	select {
-	case <-wait:
-	case <-errc:
-	}
+func (e *Podman) wait(ctx context.Context, id string) (*runtime.State, error) {
+	containers.Wait(ctx, id, &containers.WaitOptions{
+		Conditions: []string{"created", "exited", "dead", "removing", "removed"},
+	})
 
-	info, err := e.client.ContainerInspect(ctx, id)
+	info, err := containers.Inspect(ctx, id, &containers.InspectOptions{})
 	if err != nil {
 		return nil, err
 	}
 
 	return &runtime.State{
 		Exited:    !info.State.Running,
-		ExitCode:  info.State.ExitCode,
+		ExitCode:  int(info.State.ExitCode),
 		OOMKilled: info.State.OOMKilled,
 	}, nil
 }
 
 // helper function emulates the `docker logs -f` command, streaming all container logs until the container stops.
-func (e *Docker) deferTail(ctx context.Context, id string, output io.Writer) (logs io.ReadCloser, err error) {
-	opts := types.ContainerLogsOptions{
-		Follow:     true,
-		ShowStdout: true,
-		ShowStderr: true,
-		Details:    false,
-		Timestamps: false,
+func (e *Podman) deferTail(ctx context.Context, id string, output io.Writer) (logs io.ReadCloser, err error) {
+	opts := containers.LogOptions{
+		Follow:     toPtr(true),
+		Stdout:     toPtr(true),
+		Stderr:     toPtr(true),
+		Timestamps: toPtr(false),
 	}
 
-	logs, err = e.client.ContainerLogs(ctx, id, opts)
+	out := make(chan string, 100)
+	error := make(chan string, 100)
+
+	err = containers.Logs(ctx, id, &opts, out, error)
 	if err != nil {
 		logger.FromContext(ctx).
 			WithError(err).
@@ -382,23 +371,25 @@ func (e *Docker) deferTail(ctx context.Context, id string, output io.Writer) (lo
 }
 
 // helper function emulates the `docker logs -f` command, streaming all container logs until the container stops.
-func (e *Docker) tail(ctx context.Context, id string, output io.Writer) error {
-	opts := types.ContainerLogsOptions{
-		Follow:     true,
-		ShowStdout: true,
-		ShowStderr: true,
-		Details:    false,
-		Timestamps: false,
+func (e *Podman) tail(ctx context.Context, id string, output io.Writer) error {
+	opts := containers.LogOptions{
+		Follow:     toPtr(true),
+		Stdout:     toPtr(true),
+		Stderr:     toPtr(true),
+		Timestamps: toPtr(false),
 	}
 
-	logs, err := e.client.ContainerLogs(ctx, id, opts)
+	out := make(chan string, 100)
+	error := make(chan string, 100)
+
+	err := containers.Logs(ctx, id, &opts, out, error)
 	if err != nil {
 		return err
 	}
 
-	go func() {
-		stdcopy.StdCopy(output, output, logs)
-		logs.Close()
-	}()
+	// go func() {
+	// 	stdcopy.StdCopy(output, output, logs)
+	// 	logs.Close()
+	// }()
 	return nil
 }

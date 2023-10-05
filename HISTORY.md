@@ -3,7 +3,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 1.6.3
 ### Fixed
-- use path prefix when evaluating restricted volume mounts. See [#ea74fa2](https://github.com/drone-runners/drone-runner-docker/commit/ea74fa2ba442eacb0812ad5983c305a16b6763bc).
+- use path prefix when evaluating restricted volume mounts. See [#ea74fa2](https://github.com/drone-runners/drone-runner-podman/commit/ea74fa2ba442eacb0812ad5983c305a16b6763bc).
 
 ## 1.6.2
 ### Added

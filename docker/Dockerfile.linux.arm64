@@ -18,5 +18,5 @@ COPY --from=alpine /bin/tmate /bin/
 
 LABEL com.centurylinklabs.watchtower.stop-signal="SIGINT"
 
-ADD release/linux/arm64/drone-runner-docker /bin/
-ENTRYPOINT ["/bin/drone-runner-docker"]
+ADD release/linux/arm64/drone-runner-podman /bin/
+ENTRYPOINT ["/bin/drone-runner-podman"]

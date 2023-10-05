@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/drone-runners/drone-runner-docker/engine/resource"
+	"github.com/drone-runners/drone-runner-podman/engine/resource"
 	"github.com/drone/drone-go/drone"
 	"github.com/drone/runner-go/manifest"
 )
@@ -130,7 +130,7 @@ func checkStep(step *resource.Step, trusted bool) error {
 	}
 	for _, mount := range step.Volumes {
 		switch mount.Name {
-		case "workspace", "_workspace", "_docker_socket":
+		case "workspace", "_workspace", "_podman_socket":
 			return fmt.Errorf("linter: invalid volume name: %s", mount.Name)
 		}
 		if strings.HasPrefix(filepath.Clean(mount.MountPath), "/run/drone") {
@@ -157,7 +157,7 @@ func checkVolumes(pipeline *resource.Pipeline, trusted bool) error {
 		switch volume.Name {
 		case "":
 			return fmt.Errorf("linter: missing volume name")
-		case "workspace", "_workspace", "_docker_socket":
+		case "workspace", "_workspace", "_podman_socket":
 			return fmt.Errorf("linter: invalid volume name: %s", volume.Name)
 		}
 	}

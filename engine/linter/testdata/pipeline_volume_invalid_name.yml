@@ -1,14 +1,14 @@
 ---
 kind: pipeline
-type: docker
+type: podman
 name: linux
 
 steps:
 - name: test
-  image: docker
+  image: podman
   volumes:
-  - name: _docker_socket
-    path: /var/run/docker.sock
+  - name: _podman_socket
+    path: /run/podman/podman.sock
   commands:
-  - docker system prune
+  - podman system prune
 

@@ -102,14 +102,14 @@ type Config struct {
 		SkipVerify bool   `envconfig:"DRONE_REGISTRY_PLUGIN_SKIP_VERIFY"`
 	}
 
-	Docker struct {
-		Config string `envconfig:"DRONE_DOCKER_CONFIG"`
-		Stream bool   `envconfig:"DRONE_DOCKER_STREAM_PULL" default:"true"`
+	Podman struct {
+		Config string `envconfig:"DRONE_PODMAN_CONFIG"`
+		Stream bool   `envconfig:"DRONE_PODMAN_STREAM_PULL" default:"true"`
 	}
 
 	Tmate struct {
 		Enabled        bool   `envconfig:"DRONE_TMATE_ENABLED" default:"false"`
-		Image          string `envconfig:"DRONE_TMATE_IMAGE"   default:"drone/drone-runner-docker:1"`
+		Image          string `envconfig:"DRONE_TMATE_IMAGE"   default:"drone/drone-runner-podman:1"`
 		Server         string `envconfig:"DRONE_TMATE_HOST"`
 		Port           string `envconfig:"DRONE_TMATE_PORT"`
 		RSA            string `envconfig:"DRONE_TMATE_FINGERPRINT_RSA"`

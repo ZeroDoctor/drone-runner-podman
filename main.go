@@ -5,7 +5,7 @@
 package main
 
 import (
-	"github.com/drone-runners/drone-runner-docker/command"
+	"github.com/drone-runners/drone-runner-podman/command"
 	_ "github.com/joho/godotenv/autoload"
 )
 

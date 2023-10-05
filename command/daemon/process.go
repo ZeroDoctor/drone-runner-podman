@@ -5,10 +5,12 @@
 package daemon
 
 import (
-	"github.com/drone-runners/drone-runner-docker/engine"
-	"github.com/drone-runners/drone-runner-docker/engine/compiler"
-	"github.com/drone-runners/drone-runner-docker/engine/linter"
-	"github.com/drone-runners/drone-runner-docker/engine/resource"
+	"context"
+
+	"github.com/drone-runners/drone-runner-podman/engine"
+	"github.com/drone-runners/drone-runner-podman/engine/compiler"
+	"github.com/drone-runners/drone-runner-podman/engine/linter"
+	"github.com/drone-runners/drone-runner-podman/engine/resource"
 	"github.com/drone/runner-go/pipeline/uploader"
 
 	"github.com/drone/runner-go/client"
@@ -54,12 +56,12 @@ func (c *processCommand) run(*kingpin.ParseContext) error {
 	)
 
 	opts := engine.Opts{
-		HidePull: !config.Docker.Stream,
+		HidePull: !config.Podman.Stream,
 	}
-	engine, err := engine.NewEnv(opts)
+	engine, err := engine.NewEnv(context.Background(), opts)
 	if err != nil {
 		logrus.WithError(err).
-			Fatalln("cannot load the docker engine")
+			Fatalln("cannot load the podman engine")
 	}
 
 	remote := remote.New(cli)
@@ -98,7 +100,7 @@ func (c *processCommand) run(*kingpin.ParseContext) error {
 			),
 			Registry: registry.Combine(
 				registry.File(
-					config.Docker.Config,
+					config.Podman.Config,
 				),
 				registry.External(
 					config.Registry.Endpoint,

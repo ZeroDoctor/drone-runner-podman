@@ -2,6 +2,7 @@
 // Use of this source code is governed by the Polyform License
 // that can be found in the LICENSE file.
 
+//go:build !windows
 // +build !windows
 
 package compiler
@@ -9,14 +10,13 @@ package compiler
 import (
 	"context"
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"testing"
 
 	"github.com/dchest/uniuri"
-	"github.com/drone-runners/drone-runner-docker/engine"
-	"github.com/drone-runners/drone-runner-docker/engine/resource"
+	"github.com/drone-runners/drone-runner-podman/engine"
+	"github.com/drone-runners/drone-runner-podman/engine/resource"
 	"github.com/drone/drone-go/drone"
 	"github.com/drone/runner-go/environ/provider"
 	"github.com/drone/runner-go/manifest"
@@ -280,7 +280,7 @@ func testCompile(t *testing.T, source, golden string) *engine.Spec {
 
 	got := compiler.Compile(nocontext, args)
 
-	raw, err := ioutil.ReadFile(golden)
+	raw, err := os.ReadFile(golden)
 	if err != nil {
 		t.Error(err)
 	}
@@ -320,13 +320,13 @@ func TestIsPrivileged(t *testing.T) {
 		t.Errorf("Disable privileged mode if commands are specified")
 	}
 	if c.isPrivileged(&resource.Step{Image: "foo", Command: []string{"echo hello", "echo world"}}) {
-		t.Errorf("Disable privileged mode if the Docker command is specified")
+		t.Errorf("Disable privileged mode if the Podman command is specified")
 	}
 	if c.isPrivileged(&resource.Step{Image: "foo", Entrypoint: []string{"/bin/sh"}}) {
-		t.Errorf("Disable privileged mode if the Docker entrypoint is specified")
+		t.Errorf("Disable privileged mode if the Podman entrypoint is specified")
 	}
-	if c.isPrivileged(&resource.Step{Image: "foo", Volumes: []*resource.VolumeMount{{MountPath: "/var/run/docker.sock"}}}) {
-		t.Errorf("Disable privileged mode if /var/run/docker.sock mounted")
+	if c.isPrivileged(&resource.Step{Image: "foo", Volumes: []*resource.VolumeMount{{MountPath: "/var/run/podman.sock"}}}) {
+		t.Errorf("Disable privileged mode if /var/run/podman.sock mounted")
 	}
 	if c.isPrivileged(&resource.Step{Image: "foo", Volumes: []*resource.VolumeMount{{MountPath: "/var"}}}) {
 		t.Errorf("Disable privileged mode if /var mounted")

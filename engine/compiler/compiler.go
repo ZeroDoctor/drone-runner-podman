@@ -9,9 +9,9 @@ import (
 	"os"
 	"strings"
 
-	"github.com/drone-runners/drone-runner-docker/engine"
-	"github.com/drone-runners/drone-runner-docker/engine/resource"
-	"github.com/drone-runners/drone-runner-docker/internal/docker/image"
+	"github.com/drone-runners/drone-runner-podman/engine"
+	"github.com/drone-runners/drone-runner-podman/engine/resource"
+	"github.com/drone-runners/drone-runner-podman/internal/podman/image"
 
 	"github.com/drone/drone-go/drone"
 	"github.com/drone/runner-go/clone"
@@ -37,7 +37,7 @@ var random = func() string {
 // with privileged capabilities in order to run Docker
 // in Docker.
 var Privileged = []string{
-	"plugins/docker",
+	"plugins/podman",
 	"plugins/acr",
 	"plugins/ecr",
 	"plugins/gcr",
@@ -230,7 +230,7 @@ func (c *Compiler) Compile(ctx context.Context, args runtime.CompilerArgs) runti
 	)
 
 	// create network reference variables
-	envs["DRONE_DOCKER_NETWORK_ID"] = spec.Network.ID
+	envs["DRONE_PODMAN_NETWORK_ID"] = spec.Network.ID
 
 	// create the workspace variables
 	envs["DRONE_WORKSPACE"] = full
@@ -239,9 +239,9 @@ func (c *Compiler) Compile(ctx context.Context, args runtime.CompilerArgs) runti
 
 	// create volume reference variables
 	if volume.EmptyDir != nil {
-		envs["DRONE_DOCKER_VOLUME_ID"] = volume.EmptyDir.ID
+		envs["DRONE_PODMAN_VOLUME_ID"] = volume.EmptyDir.ID
 	} else {
-		envs["DRONE_DOCKER_VOLUME_PATH"] = volume.HostPath.Path
+		envs["DRONE_PODMAN_VOLUME_PATH"] = volume.HostPath.Path
 	}
 
 	// create tmate variables
@@ -359,7 +359,7 @@ func (c *Compiler) Compile(ctx context.Context, args runtime.CompilerArgs) runti
 			Labels:     stageLabels,
 			Pull:       engine.PullIfNotExists,
 			Image:      image.Expand(c.Tmate.Image),
-			Entrypoint: []string{"/bin/drone-runner-docker"},
+			Entrypoint: []string{"/bin/drone-runner-podman"},
 			Command:    []string{"copy"},
 			Network:    "none",
 		})
@@ -531,7 +531,7 @@ func (c *Compiler) Compile(ctx context.Context, args runtime.CompilerArgs) runti
 // feature toggle that disables the check that restricts
 // docker plugins from mounting volumes.
 // DO NOT USE: THIS WILL BE DEPRECATED IN THE FUTURE
-var allowDockerPluginVolumes = os.Getenv("DRONE_FLAG_ALLOW_DOCKER_PLUGIN_VOLUMES") == "true"
+var allowPodmanPluginVolumes = os.Getenv("DRONE_FLAG_ALLOW_PODMAN_PLUGIN_VOLUMES") == "true"
 
 func (c *Compiler) isPrivileged(step *resource.Step) bool {
 	// privileged-by-default containers are only
@@ -547,7 +547,7 @@ func (c *Compiler) isPrivileged(step *resource.Step) bool {
 		return false
 	}
 
-	if allowDockerPluginVolumes == false {
+	if allowPodmanPluginVolumes == false {
 		if len(step.Volumes) > 0 {
 			return false
 		}

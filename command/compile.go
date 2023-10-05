@@ -7,14 +7,14 @@ package command
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 
-	"github.com/drone-runners/drone-runner-docker/command/internal"
-	"github.com/drone-runners/drone-runner-docker/engine/compiler"
-	"github.com/drone-runners/drone-runner-docker/engine/linter"
-	"github.com/drone-runners/drone-runner-docker/engine/resource"
+	"github.com/drone-runners/drone-runner-podman/command/internal"
+	"github.com/drone-runners/drone-runner-podman/engine/compiler"
+	"github.com/drone-runners/drone-runner-podman/engine/linter"
+	"github.com/drone-runners/drone-runner-podman/engine/resource"
 	"github.com/drone/envsubst"
 	"github.com/drone/runner-go/environ"
 	"github.com/drone/runner-go/environ/provider"
@@ -43,7 +43,7 @@ type compileCommand struct {
 }
 
 func (c *compileCommand) run(*kingpin.ParseContext) error {
-	rawsource, err := ioutil.ReadAll(c.Source)
+	rawsource, err := io.ReadAll(c.Source)
 	if err != nil {
 		return err
 	}
@@ -171,7 +171,7 @@ func registerCompile(app *kingpin.Application) {
 	cmd.Flag("volumes", "container volumes").
 		StringMapVar(&c.Volumes)
 
-	cmd.Flag("privileged", "privileged docker images").
+	cmd.Flag("privileged", "privileged podman images").
 		StringsVar(&c.Privileged)
 
 	cmd.Flag("cpu-period", "container cpu period").
@@ -192,11 +192,11 @@ func registerCompile(app *kingpin.Application) {
 	cmd.Flag("memory-swap", "container memory swap limit").
 		Int64Var(&c.Resources.MemorySwap)
 
-	cmd.Flag("docker-config", "path to the docker config file").
+	cmd.Flag("podman-config", "path to the podman config file").
 		StringVar(&c.Config)
 
-	cmd.Flag("tmate-image", "tmate docker image").
-		Default("drone/drone-runner-docker:1").
+	cmd.Flag("tmate-image", "tmate podman image").
+		Default("drone/drone-runner-podman:1").
 		StringVar(&c.Tmate.Image)
 
 	cmd.Flag("tmate-enabled", "tmate enabled").

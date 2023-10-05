@@ -10,7 +10,7 @@ data: f0e4c2f76c58916ec25
 
 ---
 kind: pipeline
-type: docker
+type: podman
 name: default
 version: 1
 
@@ -54,7 +54,7 @@ services:
   command: [ "--debug" ]
 
 image_pull_secrets:
-- dockerconfigjson
+- podmanconfigjson
 
 trigger:
   branch: [ master ]

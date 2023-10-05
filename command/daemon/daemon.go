@@ -8,11 +8,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/drone-runners/drone-runner-docker/engine"
-	"github.com/drone-runners/drone-runner-docker/engine/compiler"
-	"github.com/drone-runners/drone-runner-docker/engine/linter"
-	"github.com/drone-runners/drone-runner-docker/engine/resource"
-	"github.com/drone-runners/drone-runner-docker/internal/match"
+	"github.com/drone-runners/drone-runner-podman/engine"
+	"github.com/drone-runners/drone-runner-podman/engine/compiler"
+	"github.com/drone-runners/drone-runner-podman/engine/linter"
+	"github.com/drone-runners/drone-runner-podman/engine/resource"
+	"github.com/drone-runners/drone-runner-podman/internal/match"
 
 	"github.com/drone/runner-go/client"
 	"github.com/drone/runner-go/environ/provider"
@@ -82,31 +82,12 @@ func (c *daemonCommand) run(*kingpin.ParseContext) error {
 	)
 
 	opts := engine.Opts{
-		HidePull: !config.Docker.Stream,
+		HidePull: !config.Podman.Stream,
 	}
-	engine, err := engine.NewEnv(opts)
+	engine, err := engine.NewEnv(context.Background(), opts)
 	if err != nil {
 		logrus.WithError(err).
-			Fatalln("cannot load the docker engine")
-	}
-	for {
-		err := engine.Ping(ctx)
-		if err == context.Canceled {
-			break
-		}
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-		if err != nil {
-			logrus.WithError(err).
-				Errorln("cannot ping the docker daemon")
-			time.Sleep(time.Second)
-		} else {
-			logrus.Debugln("successfully pinged the docker daemon")
-			break
-		}
+			Fatalln("cannot load the podman engine")
 	}
 
 	remote := remote.New(cli)
@@ -162,7 +143,7 @@ func (c *daemonCommand) run(*kingpin.ParseContext) error {
 			),
 			Registry: registry.Combine(
 				registry.File(
-					config.Docker.Config,
+					config.Podman.Config,
 				),
 				registry.External(
 					config.Registry.Endpoint,

@@ -8,16 +8,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/drone-runners/drone-runner-docker/command/internal"
-	"github.com/drone-runners/drone-runner-docker/engine"
-	"github.com/drone-runners/drone-runner-docker/engine/compiler"
-	"github.com/drone-runners/drone-runner-docker/engine/linter"
-	"github.com/drone-runners/drone-runner-docker/engine/resource"
+	"github.com/drone-runners/drone-runner-podman/command/internal"
+	"github.com/drone-runners/drone-runner-podman/engine"
+	"github.com/drone-runners/drone-runner-podman/engine/compiler"
+	"github.com/drone-runners/drone-runner-podman/engine/linter"
+	"github.com/drone-runners/drone-runner-podman/engine/resource"
 
 	"github.com/drone/drone-go/drone"
 	"github.com/drone/envsubst"
@@ -63,7 +63,7 @@ type execCommand struct {
 }
 
 func (c *execCommand) run(*kingpin.ParseContext) error {
-	rawsource, err := ioutil.ReadAll(c.Source)
+	rawsource, err := io.ReadAll(c.Source)
 	if err != nil {
 		return err
 	}
@@ -231,7 +231,7 @@ func (c *execCommand) run(*kingpin.ParseContext) error {
 		),
 	)
 
-	engine, err := engine.NewEnv(engine.Opts{})
+	engine, err := engine.NewEnv(context.Background(), engine.Opts{})
 	if err != nil {
 		return err
 	}
@@ -301,7 +301,7 @@ func registerExec(app *kingpin.Application) {
 	cmd.Flag("volumes", "container volumes").
 		StringMapVar(&c.Volumes)
 
-	cmd.Flag("privileged", "privileged docker images").
+	cmd.Flag("privileged", "privileged podman images").
 		StringsVar(&c.Privileged)
 
 	cmd.Flag("cpu-period", "container cpu period").
@@ -328,11 +328,11 @@ func registerExec(app *kingpin.Application) {
 	cmd.Flag("private-key", "private key file path").
 		ExistingFileVar(&c.PrivateKey)
 
-	cmd.Flag("docker-config", "path to the docker config file").
+	cmd.Flag("podman-config", "path to the podman config file").
 		StringVar(&c.Config)
 
-	cmd.Flag("tmate-image", "tmate docker image").
-		Default("drone/drone-runner-docker:1").
+	cmd.Flag("tmate-image", "tmate podman image").
+		Default("drone/drone-runner-podman:1").
 		StringVar(&c.Tmate.Image)
 
 	cmd.Flag("tmate-enabled", "tmate enabled").

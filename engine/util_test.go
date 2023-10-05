@@ -3,3 +3,9 @@
 // that can be found in the LICENSE file.
 
 package engine
+
+import "testing"
+
+func TestChansToReader(t *testing.T) {
+
+}
