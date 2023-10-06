@@ -5,7 +5,6 @@
 package engine
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"reflect"
@@ -38,14 +37,14 @@ type ReaderClose struct {
 	channels []chan string
 }
 
-func NewChansReadClose(ctx context.Context, channels ...chan string) ReaderClose {
-	return ReaderClose{
+func NewChansReadClose(ctx context.Context, channels ...chan string) *ReaderClose {
+	return &ReaderClose{
 		ctx:      ctx,
 		channels: channels,
 	}
 }
 
-func (c *ReaderClose) Read(p []byte) (int, error) {
+func (c *ReaderClose) Read(p []byte) (n int, err error) {
 	cases := make([]reflect.SelectCase, len(c.channels))
 	for i := range c.channels {
 		cases[i] = reflect.SelectCase{Dir: reflect.SelectRecv, Chan: reflect.ValueOf(c.channels[i])}
@@ -56,7 +55,7 @@ func (c *ReaderClose) Read(p []byte) (int, error) {
 		select {
 		case <-c.ctx.Done():
 			c.Close()
-			return len(p), nil
+			return n, io.EOF
 		default:
 		}
 
@@ -67,10 +66,10 @@ func (c *ReaderClose) Read(p []byte) (int, error) {
 			continue
 		}
 
-		io.WriteString(bytes.NewBuffer(p), value.String())
+		n += copy(p, []byte(value.String()))
 	}
 
-	return len(p), io.EOF
+	return n, io.EOF
 }
 
 func (c *ReaderClose) Close() error {

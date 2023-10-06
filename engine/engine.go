@@ -14,7 +14,6 @@ import (
 	"github.com/drone-runners/drone-runner-podman/internal/podman/errors"
 	"github.com/drone-runners/drone-runner-podman/internal/podman/image"
 	"github.com/drone-runners/drone-runner-podman/internal/podman/jsonmessage"
-	"github.com/drone-runners/drone-runner-podman/internal/podman/stdcopy"
 	"github.com/drone/runner-go/logger"
 	"github.com/drone/runner-go/pipeline/runtime"
 
@@ -353,8 +352,8 @@ func (e *Podman) deferTail(ctx context.Context, id string, output io.Writer) (lo
 		Timestamps: toPtr(false),
 	}
 
-	out := make(chan string, 100)
-	error := make(chan string, 100)
+	out := make(chan string, 512)
+	error := make(chan string, 512)
 
 	err = containers.Logs(ctx, id, &opts, out, error)
 	if err != nil {
@@ -365,7 +364,8 @@ func (e *Podman) deferTail(ctx context.Context, id string, output io.Writer) (lo
 		return nil, err
 	}
 
-	stdcopy.StdCopy(output, output, logs)
+	logs = NewChansReadClose(ctx, out, error)
+	io.Copy(output, logs)
 
 	return logs, nil
 }
@@ -387,9 +387,11 @@ func (e *Podman) tail(ctx context.Context, id string, output io.Writer) error {
 		return err
 	}
 
-	// go func() {
-	// 	stdcopy.StdCopy(output, output, logs)
-	// 	logs.Close()
-	// }()
+	go func() {
+		logs := NewChansReadClose(ctx, out, error)
+		io.Copy(output, logs)
+		logs.Close()
+	}()
+
 	return nil
 }
