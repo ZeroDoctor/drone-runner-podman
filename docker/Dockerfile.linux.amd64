@@ -1,10 +1,25 @@
-FROM alpine:3 as alpine
-RUN apk add -U --no-cache ca-certificates
+FROM golang:alpine AS builder
 
+RUN apk add -U --no-cache \
+  ca-certificates \
+  gcc \
+  musl-dev \
+  lvm2-dev \
+  gpgme-dev \
+  btrfs-progs-dev 
+  
 RUN wget https://github.com/tmate-io/tmate/releases/download/2.4.0/tmate-2.4.0-static-linux-amd64.tar.xz
 RUN tar -xf tmate-2.4.0-static-linux-amd64.tar.xz
 RUN mv tmate-2.4.0-static-linux-amd64/tmate /bin/
 RUN chmod +x /bin/tmate
+  
+WORKDIR /go/src/drone-runner-podman
+
+# ADD go.mod go.sum /go/src/drone-runner-podman/
+
+COPY . .
+RUN go mod download
+RUN go build -o drone-runner-podman .
 
 FROM alpine:3
 EXPOSE 3000
@@ -13,10 +28,15 @@ ENV GODEBUG netdns=go
 ENV DRONE_PLATFORM_OS linux
 ENV DRONE_PLATFORM_ARCH amd64
 
-COPY --from=alpine /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=alpine /bin/tmate /bin/
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /bin/tmate /bin/
 
 LABEL com.centurylinklabs.watchtower.stop-signal="SIGINT"
 
-ADD release/linux/amd64/drone-runner-podman /bin/
+# TODO: figure out which libs are needed
+COPY --from=builder /lib /lib
+COPY --from=builder /usr/local/lib /usr/local/lib
+COPY --from=builder /usr/lib /usr/lib
+
+COPY --from=builder /go/src/drone-runner-podman /bin/
 ENTRYPOINT ["/bin/drone-runner-podman"]
