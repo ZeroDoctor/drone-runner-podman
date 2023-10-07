@@ -84,7 +84,7 @@ func (c *daemonCommand) run(*kingpin.ParseContext) error {
 	opts := engine.Opts{
 		HidePull: !config.Podman.Stream,
 	}
-	engine, err := engine.NewEnv(context.Background(), opts)
+	engine, err := engine.NewEnv(ctx, opts)
 	if err != nil {
 		logrus.WithError(err).
 			Fatalln("cannot load the podman engine")

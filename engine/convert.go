@@ -109,6 +109,7 @@ func toSpec(spec *Spec, step *Step) *specgen.SpecGenerator {
 		ContainerResourceConfig: resource,
 	}
 
+	logrus.Debugf("creating [config=%+v]", config)
 	return config
 }
 

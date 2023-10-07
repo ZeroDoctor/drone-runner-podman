@@ -5,7 +5,7 @@ go 1.20
 require (
 	github.com/buildkite/yaml v2.1.0+incompatible
 	github.com/containers/common v0.56.0
-	github.com/containers/podman/v4 v4.7.0
+	github.com/containers/podman/v4 v4.7.1
 	github.com/dchest/uniuri v1.2.0
 	github.com/docker/distribution v2.8.3+incompatible
 	github.com/docker/docker v24.0.6+incompatible
