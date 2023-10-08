@@ -238,12 +238,21 @@ func (e *Podman) Run(ctx context.Context, specv runtime.Spec, stepv runtime.Step
 		}
 		defer logs.Close()
 	} else {
+		var buf bytes.Buffer
+		multiWriter := io.MultiWriter(output, &buf)
+
 		logger.FromContext(ctx).Tracef("tail logging...")
-		err = e.tail(ctx, step.ID, output)
+		err = e.tail(ctx, step.ID, multiWriter)
 		if err != nil {
+			logger.FromContext(ctx).
+				WithError(err).
+				Errorf("failed to tail logs")
 			return nil, errors.TrimExtraInfo(err)
 		}
+
+		logger.FromContext(ctx).Debugf("[tail_logs=%s]", buf.String())
 	}
+
 	// wait for the response
 	return e.waitRetry(ctx, step.ID)
 }
@@ -408,17 +417,17 @@ func (e *Podman) tail(ctx context.Context, id string, output io.Writer) error {
 		Timestamps: toPtr(false),
 	}
 
-	out := make(chan string, 100)
-	error := make(chan string, 100)
+	out := make(chan string, 1000)
+	error := make(chan string, 1000)
 
 	err := containers.Logs(e.conn, id, &opts, out, error)
 	if err != nil {
 		return err
 	}
+	logs := NewChansReadClose(ctx, out, error)
 
 	logger.FromContext(ctx).Debugf("starting log goroutine [id=%s]...", id)
 	go func() {
-		logs := NewChansReadClose(ctx, out, error)
 		io.Copy(output, logs)
 		logs.Close()
 	}()

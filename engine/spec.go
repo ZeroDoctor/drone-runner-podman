@@ -5,6 +5,8 @@
 package engine
 
 import (
+	"fmt"
+
 	"github.com/drone/runner-go/environ"
 	"github.com/drone/runner-go/pipeline/runtime"
 )
@@ -137,6 +139,17 @@ type (
 
 func (s *Spec) StepLen() int              { return len(s.Steps) }
 func (s *Spec) StepAt(i int) runtime.Step { return s.Steps[i] }
+func (s *Spec) String() string {
+	return fmt.Sprintf(`{
+	Platform: %+v
+	Steps: %+v
+	Internal: %+v
+	Volumes: %+v
+	Network: %+v
+}`, s.Platform, s.Steps, s.Internal,
+		s.Volumes, s.Network,
+	)
+}
 
 //
 // implements the Secret interface
@@ -165,4 +178,49 @@ func (s *Step) Clone() runtime.Step {
 	*dst = *s
 	dst.Envs = environ.Combine(s.Envs)
 	return dst
+}
+func (s *Step) String() string {
+	return fmt.Sprintf(`{
+		ID: %s
+		Auth: %+v
+		Command: %+v
+		CPUPeriod: %d
+		CPUQuota: %d
+		CPUShares: %d
+		CPUSet: %+v
+		Detach: %t
+		DependsOn: %+v
+		Devices: %+v
+		DNS: %+v
+		DNSSearch: %+v
+		Entrypoint: %+v
+		Envs: %+v
+		ErrPolicy: %+v
+		ExtraHosts: %+v
+		IgnoreStdout: %t
+		IgnoreStderr: %t
+		Image: %s
+		Labels: %+v
+		MemSwapLimit: %d
+		MemLimit: %d
+		Name: %s
+		Network: %s
+		Networks: %+v
+		Privileged: %t
+		Pull: %+v
+		RunPolicy: %+v
+		Secrets: %+v
+		ShmSize: %d
+		User: %s
+		Volumes: %+v
+		WorkingDir: %s
+	}`, s.ID, s.Auth, s.Command, s.CPUPeriod,
+		s.CPUQuota, s.CPUShares, s.CPUSet, s.Detach,
+		s.DependsOn, s.Devices, s.DNS, s.DNSSearch,
+		s.Entrypoint, s.Envs, s.ErrPolicy, s.ExtraHosts,
+		s.IgnoreStdout, s.IgnoreStderr, s.Image, s.Labels,
+		s.MemSwapLimit, s.MemLimit, s.Name, s.Network,
+		s.Networks, s.Privileged, s.Pull, s.RunPolicy,
+		s.Secrets, s.ShmSize, s.User, s.Volumes, s.WorkingDir,
+	)
 }

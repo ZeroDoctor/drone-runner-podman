@@ -67,6 +67,7 @@ func (c *ReaderClose) Read(p []byte) (n int, err error) {
 		}
 
 		n += copy(p, []byte(value.String()))
+		return n, nil
 	}
 
 	return n, io.EOF

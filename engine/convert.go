@@ -33,9 +33,9 @@ func toSpec(spec *Spec, step *Step) *specgen.SpecGenerator {
 	}
 
 	volume := specgen.ContainerStorageConfig{
-		Image:   step.Image,
-		WorkDir: step.WorkingDir,
-		ShmSize: toPtr(step.ShmSize),
+		WorkDir:          step.WorkingDir,
+		CreateWorkingDir: true,
+		ShmSize:          toPtr(step.ShmSize),
 	}
 
 	volumeSet := toVolumeSet(spec, step)
@@ -109,7 +109,7 @@ func toSpec(spec *Spec, step *Step) *specgen.SpecGenerator {
 		ContainerResourceConfig: resource,
 	}
 
-	logrus.Debugf("creating [config=%+v]", config)
+	logrus.Tracef("creating [config=%+v]", config)
 	return config
 }
 

@@ -7,21 +7,24 @@ package engine
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
+	"strconv"
+	"strings"
 	"testing"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 func TestChansToReader(t *testing.T) {
 	ctx := context.Background()
 
 	stdout := make(chan string, 1000)
+	stderr := make(chan string, 1000)
 
-	logs := NewChansReadClose(ctx, stdout)
+	logs := NewChansReadClose(ctx, stdout, stderr)
 
 	mockLogs := []string{
-		"\u0008",
 		"this is a log 1\n",
 		"this is a log 2\n",
 		"this is a log 3\n",
@@ -38,17 +41,71 @@ func TestChansToReader(t *testing.T) {
 
 	go func(mock []string) {
 		for i := range mock {
-			time.Sleep(2)
-			fmt.Printf("sending [mock=%s]\n", mock[i])
-			stdout <- mock[i]
+			time.Sleep(500 * time.Millisecond)
+			if i%3 == 0 {
+				stderr <- "err " + mock[i]
+				continue
+			}
+
+			stdout <- "out " + mock[i]
 		}
-		fmt.Println("closing channel...")
 		logs.Close()
 	}(mockLogs)
 
-	fmt.Println("starting std copy...")
 	output := bytes.NewBuffer([]byte{})
-	io.Copy(output, logs)
+	n, err := io.Copy(output, logs)
+	if err != nil {
+		logrus.Errorf("failed to copy reader to ouput [error=%s]", err.Error())
+		t.Fail()
+	}
 
-	fmt.Print(output.String())
+	logrus.Infof("[bytes=%d] [logs=%s]\n",
+		n, output.String(),
+	)
+	splitResult := strings.Split(output.String(), "\n")
+	for i := range mockLogs {
+		if i%3 == 0 {
+			if !checkStrErr(i, splitResult[i]) {
+				logrus.Errorf("logs do not match\n\t[expect=%s]\n\t[got=%s]",
+					"err "+mockLogs[i], splitResult[i],
+				)
+				t.Fail()
+			}
+			continue
+		}
+
+		if !checkStrOut(i, splitResult[i]) {
+			logrus.Errorf("logs do not match\n\t[expect=%s]\n\t[got=%s]",
+				"out "+mockLogs[i], splitResult[i],
+			)
+			t.Fail()
+		}
+	}
+}
+
+func checkStrErr(line int, strerr string) bool {
+	if strerr[:3] != "err" {
+		return false
+	}
+
+	return checkStr(line, strerr)
+}
+
+func checkStrOut(line int, strout string) bool {
+	if strout[:3] != "out" {
+		return false
+	}
+
+	return checkStr(line, strout)
+}
+
+func checkStr(line int, str string) bool {
+	split := strings.Split(str, " ")
+
+	n, err := strconv.Atoi(split[len(split)-1])
+	if err != nil {
+		panic(err)
+	}
+
+	return line+1 == n
 }
