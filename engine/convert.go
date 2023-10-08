@@ -33,21 +33,16 @@ func toSpec(spec *Spec, step *Step) *specgen.SpecGenerator {
 	}
 
 	volume := specgen.ContainerStorageConfig{
+		Image:            step.Image,
 		WorkDir:          step.WorkingDir,
 		CreateWorkingDir: true,
 		ShmSize:          toPtr(step.ShmSize),
 	}
 
-	volumeSet := toVolumeSet(spec, step)
-	for path := range volumeSet {
-		volume.Volumes = append(volume.Volumes, &specgen.NamedVolume{
-			Dest: path,
-		})
-	}
-
 	if len(step.Volumes) != 0 {
 		volume.Devices = toLinuxDeviceSlice(spec, step)
 		volume.Mounts = toLinuxVolumeMounts(spec, step)
+		volume.Volumes = toLinuxVolumeSlice(spec, step)
 	}
 
 	security := specgen.ContainerSecurityConfig{
@@ -140,35 +135,9 @@ func toLinuxDeviceSlice(spec *Spec, step *Step) []specs.LinuxDevice {
 	return to
 }
 
-// helper function that converts a slice of volume paths to a set
-// of unique volume names.
-func toVolumeSet(spec *Spec, step *Step) map[string]struct{} {
-	set := map[string]struct{}{}
-	for _, mount := range step.Volumes {
-		volume, ok := lookupVolume(spec, mount.Name)
-		if !ok {
-			continue
-		}
-		if isDevice(volume) {
-			continue
-		}
-		if isNamedPipe(volume) {
-			continue
-		}
-		if isBindMount(volume) == false {
-			continue
-		}
-		set[mount.Path] = struct{}{}
-	}
-	return set
-}
-
 // helper function returns a slice of volume mounts.
-func toVolumeSlice(spec *Spec, step *Step) []string {
-	// this entire function should be deprecated in
-	// favor of toVolumeMounts, however, I am unable
-	// to get it working with data volumes.
-	var to []string
+func toLinuxVolumeSlice(spec *Spec, step *Step) []*specgen.NamedVolume {
+	var to []*specgen.NamedVolume
 	for _, mount := range step.Volumes {
 		volume, ok := lookupVolume(spec, mount.Name)
 		if !ok {
@@ -178,14 +147,19 @@ func toVolumeSlice(spec *Spec, step *Step) []string {
 			continue
 		}
 		if isDataVolume(volume) {
-			path := volume.EmptyDir.ID + ":" + mount.Path
-			to = append(to, path)
+			to = append(to, &specgen.NamedVolume{
+				Name: volume.EmptyDir.ID,
+				Dest: mount.Path,
+			})
 		}
 		if isBindMount(volume) {
-			path := volume.HostPath.Path + ":" + mount.Path
-			to = append(to, path)
+			to = append(to, &specgen.NamedVolume{
+				Name: volume.HostPath.Path,
+				Dest: mount.Path,
+			})
 		}
 	}
+
 	return to
 }
 
@@ -231,12 +205,11 @@ func toLinuxMount(source *Volume, target *VolumeMount) specs.Mount {
 			// options defaults = rw, suid, dev, exec, auto, nouser, and async
 			to.Options = append(to.Options, "ro")
 		}
-		// to.ReadOnly = source.HostPath.ReadOnly
 	}
 
 	if isTempfs(source) {
-		// NOTE: not sure if this is translatable
-		//  probably part of resource struct
+		// NOTE: specs.Mount might not be the right structure
+		//	maybe ImageVolume is suitable here
 
 		// to.TmpfsOptions = &mount.TmpfsOptions{
 		// 	SizeBytes: source.EmptyDir.SizeLimit,

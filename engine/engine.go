@@ -102,6 +102,7 @@ func (e *Podman) Setup(ctx context.Context, specv runtime.Spec) error {
 	logger.FromContext(ctx).Tracef("setup networks...")
 	_, err := network.Create(e.conn, &types.Network{
 		Driver:  driver,
+		Name:    spec.Network.ID,
 		Options: spec.Network.Options,
 		Labels:  spec.Network.Labels,
 	})
@@ -238,19 +239,14 @@ func (e *Podman) Run(ctx context.Context, specv runtime.Spec, stepv runtime.Step
 		}
 		defer logs.Close()
 	} else {
-		var buf bytes.Buffer
-		multiWriter := io.MultiWriter(output, &buf)
-
 		logger.FromContext(ctx).Tracef("tail logging...")
-		err = e.tail(ctx, step.ID, multiWriter)
+		err = e.tail(ctx, step.ID, output)
 		if err != nil {
 			logger.FromContext(ctx).
 				WithError(err).
 				Errorf("failed to tail logs")
 			return nil, errors.TrimExtraInfo(err)
 		}
-
-		logger.FromContext(ctx).Debugf("[tail_logs=%s]", buf.String())
 	}
 
 	// wait for the response
@@ -364,6 +360,10 @@ func (e *Podman) waitRetry(ctx context.Context, id string) (*runtime.State, erro
 // helper function emulates the `docker wait` command, blocking
 // until the container stops and returning the exit code.
 func (e *Podman) wait(ctx context.Context, id string) (*runtime.State, error) {
+	logger.FromContext(ctx).
+		WithField("container", id).
+		Debug("waiting for container")
+
 	containers.Wait(e.conn, id, &containers.WaitOptions{
 		Conditions: []string{"created", "exited", "dead", "removing", "removed"},
 	})
