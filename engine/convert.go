@@ -26,10 +26,12 @@ func toSpec(spec *Spec, step *Step) *specgen.SpecGenerator {
 		Command:      step.Command,
 		Stdin:        false,
 		Terminal:     false,
+		EnvSecrets:   make(map[string]string, 0),
 	}
 
 	for _, sec := range step.Secrets {
 		basic.EnvSecrets[sec.Env] = string(sec.Data)
+
 	}
 
 	volume := specgen.ContainerStorageConfig{
