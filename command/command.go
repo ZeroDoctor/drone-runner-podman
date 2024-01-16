@@ -10,7 +10,7 @@ import (
 
 	"github.com/drone-runners/drone-runner-podman/command/daemon"
 
-	"gopkg.in/alecthomas/kingpin.v2"
+	"github.com/alecthomas/kingpin"
 )
 
 // program version

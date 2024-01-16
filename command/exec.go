@@ -32,9 +32,9 @@ import (
 	"github.com/drone/runner-go/secret"
 	"github.com/drone/signal"
 
+	"github.com/alecthomas/kingpin"
 	"github.com/mattn/go-isatty"
 	"github.com/sirupsen/logrus"
-	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 type execCommand struct {

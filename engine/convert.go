@@ -30,8 +30,7 @@ func toSpec(spec *Spec, step *Step) *specgen.SpecGenerator {
 	}
 
 	for _, sec := range step.Secrets {
-		basic.EnvSecrets[sec.Env] = string(sec.Data)
-
+		basic.Env[sec.Env] = string(sec.Data)
 	}
 
 	volume := specgen.ContainerStorageConfig{
@@ -45,18 +44,13 @@ func toSpec(spec *Spec, step *Step) *specgen.SpecGenerator {
 		volume.Devices = toLinuxDeviceSlice(spec, step)
 		volume.Mounts = toLinuxVolumeMounts(spec, step)
 		volume.Volumes = toLinuxVolumeSlice(spec, step)
+		volume.OverlayVolumes = toLinuxVolumeBind(spec, step)
 	}
 
+	logrus.Tracef("[has_privileged=%+v]", step.Privileged)
 	security := specgen.ContainerSecurityConfig{
 		User:       step.User,
 		Privileged: step.Privileged,
-	}
-
-	// windows does not support privileged so we hard-code this value to false.
-	// podman doesn't even support windows so this would be a problem
-	// if we reach here
-	if spec.Platform.OS == "windows" {
-		security.Privileged = false
 	}
 
 	var dns []net.IP
@@ -140,12 +134,10 @@ func toLinuxDeviceSlice(spec *Spec, step *Step) []specs.LinuxDevice {
 // helper function returns a slice of volume mounts.
 func toLinuxVolumeSlice(spec *Spec, step *Step) []*specgen.NamedVolume {
 	var to []*specgen.NamedVolume
+
 	for _, mount := range step.Volumes {
 		volume, ok := lookupVolume(spec, mount.Name)
-		if !ok {
-			continue
-		}
-		if isDevice(volume) {
+		if !ok || isDevice(volume) || isBindMount(volume) {
 			continue
 		}
 		if isDataVolume(volume) {
@@ -154,12 +146,28 @@ func toLinuxVolumeSlice(spec *Spec, step *Step) []*specgen.NamedVolume {
 				Dest: mount.Path,
 			})
 		}
+
+		logrus.Tracef("named [host=%+v] [empty=%+v] [mount=%+v]", volume.HostPath, volume.EmptyDir, mount)
+	}
+
+	return to
+}
+
+func toLinuxVolumeBind(spec *Spec, step *Step) []*specgen.OverlayVolume {
+	var to []*specgen.OverlayVolume
+	for _, mount := range step.Volumes {
+		volume, ok := lookupVolume(spec, mount.Name)
+		if !ok || isDevice(volume) || isDataVolume(volume) {
+			continue
+		}
 		if isBindMount(volume) {
-			to = append(to, &specgen.NamedVolume{
-				Name: volume.HostPath.Path,
-				Dest: mount.Path,
+			to = append(to, &specgen.OverlayVolume{
+				Source:      volume.HostPath.Path,
+				Destination: mount.Path,
 			})
 		}
+
+		logrus.Tracef("bind [host=%+v] [empty=%+v] [mount=%+v]", volume.HostPath, volume.EmptyDir, mount)
 	}
 
 	return to
@@ -187,6 +195,7 @@ func toLinuxVolumeMounts(spec *Spec, step *Step) []specs.Mount {
 			continue
 		}
 		mounts = append(mounts, toLinuxMount(source, target))
+		logrus.Tracef("mount [host=%+v] [empty=%+v] [target=%+v]", source.HostPath, source.EmptyDir, target)
 	}
 	if len(mounts) == 0 {
 		return nil

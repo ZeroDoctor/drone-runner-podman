@@ -29,10 +29,10 @@ import (
 	"github.com/drone/runner-go/server"
 	"github.com/drone/signal"
 
+	"github.com/alecthomas/kingpin"
 	"github.com/joho/godotenv"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
-	"gopkg.in/alecthomas/kingpin.v2"
 )
 
 // empty context.

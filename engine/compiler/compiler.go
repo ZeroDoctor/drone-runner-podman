@@ -37,7 +37,7 @@ var random = func() string {
 // with privileged capabilities in order to run Docker
 // in Docker.
 var Privileged = []string{
-	"plugins/podman",
+	"plugins/docker",
 	"plugins/acr",
 	"plugins/ecr",
 	"plugins/gcr",

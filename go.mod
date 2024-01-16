@@ -5,6 +5,7 @@ go 1.21
 toolchain go1.21.4
 
 require (
+	github.com/alecthomas/kingpin v2.2.6+incompatible
 	github.com/buildkite/yaml v2.1.0+incompatible
 	github.com/containers/common v0.57.1
 	github.com/containers/podman/v4 v4.8.3
@@ -23,7 +24,6 @@ require (
 	github.com/opencontainers/runtime-spec v1.1.1-0.20230922153023-c0e90434df2a
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/sync v0.6.0
-	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 )
 
 require (
@@ -105,7 +105,6 @@ require (
 	github.com/moby/term v0.5.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/natessilva/dag v0.0.0-20180124060714-7194b8dcc5c4 // indirect
 	github.com/nxadm/tail v1.4.11 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
@@ -128,7 +127,6 @@ require (
 	github.com/sylabs/sif/v2 v2.15.1 // indirect
 	github.com/syndtr/gocapability v0.0.0-20200815063812-42c35b437635 // indirect
 	github.com/tchap/go-patricia/v2 v2.3.1 // indirect
-	github.com/theupdateframework/go-tuf v0.7.0 // indirect
 	github.com/titanous/rocacheck v0.0.0-20171023193734-afe73141d399 // indirect
 	github.com/ulikunitz/xz v0.5.11 // indirect
 	github.com/vbatts/tar-split v0.11.5 // indirect
@@ -152,5 +150,12 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	sigs.k8s.io/yaml v1.4.0 // indirect
-	tags.cncf.io/container-device-interface v0.6.2 // indirect
 )
+
+replace github.com/containers/podman/v4 v4.8.3 => github.com/containers/podman/v4 v4.7.1
+
+replace github.com/containers/common v0.57.1 => github.com/containers/common v0.56.0
+
+replace github.com/containers/image/v5 v5.29.1-0.20231120202631-293b00ba7166 => github.com/containers/image/v5 v5.28.0
+
+replace github.com/containers/storage v1.51.1-0.20231204015418-15c3cb7881e4 => github.com/containers/storage v1.50.2

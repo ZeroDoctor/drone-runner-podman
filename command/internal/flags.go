@@ -10,7 +10,7 @@ import (
 
 	"github.com/drone/drone-go/drone"
 
-	"gopkg.in/alecthomas/kingpin.v2"
+	"github.com/alecthomas/kingpin"
 )
 
 // Flags maps
