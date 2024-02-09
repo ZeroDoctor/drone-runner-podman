@@ -44,7 +44,6 @@ func toSpec(spec *Spec, step *Step) *specgen.SpecGenerator {
 		volume.Devices = toLinuxDeviceSlice(spec, step)
 		volume.Mounts = toLinuxVolumeMounts(spec, step)
 		volume.Volumes = toLinuxVolumeSlice(spec, step)
-		volume.OverlayVolumes = toLinuxVolumeBind(spec, step)
 	}
 
 	logrus.Tracef("[has_privileged=%+v]", step.Privileged)
@@ -153,49 +152,22 @@ func toLinuxVolumeSlice(spec *Spec, step *Step) []*specgen.NamedVolume {
 	return to
 }
 
-func toLinuxVolumeBind(spec *Spec, step *Step) []*specgen.OverlayVolume {
-	var to []*specgen.OverlayVolume
-	for _, mount := range step.Volumes {
-		volume, ok := lookupVolume(spec, mount.Name)
-		if !ok || isDevice(volume) || isDataVolume(volume) {
-			continue
-		}
-		if isBindMount(volume) {
-			to = append(to, &specgen.OverlayVolume{
-				Source:      volume.HostPath.Path,
-				Destination: mount.Path,
-			})
-		}
-
-		logrus.Tracef("bind [host=%+v] [empty=%+v] [mount=%+v]", volume.HostPath, volume.EmptyDir, mount)
-	}
-
-	return to
-}
-
 // helper function returns a slice of docker mount
 // configurations.
 func toLinuxVolumeMounts(spec *Spec, step *Step) []specs.Mount {
 	var mounts []specs.Mount
-	for _, target := range step.Volumes {
-		source, ok := lookupVolume(spec, target.Name)
+	for _, mount := range step.Volumes {
+		volume, ok := lookupVolume(spec, mount.Name)
 		if !ok {
 			continue
 		}
 
-		if isBindMount(source) && !isDevice(source) {
+		if isDataVolume(volume) {
 			continue
 		}
 
-		// HACK: this condition can be removed once
-		// toVolumeSlice has been fully replaced. at this
-		// time, I cannot figure out how to get mounts
-		// working with data volumes :(
-		if isDataVolume(source) {
-			continue
-		}
-		mounts = append(mounts, toLinuxMount(source, target))
-		logrus.Tracef("mount [host=%+v] [empty=%+v] [target=%+v]", source.HostPath, source.EmptyDir, target)
+		mounts = append(mounts, toLinuxMount(volume, mount))
+		logrus.Tracef("mount [host=%+v] [empty=%+v] [target=%+v]", volume.HostPath, volume.EmptyDir, mount)
 	}
 	if len(mounts) == 0 {
 		return nil
