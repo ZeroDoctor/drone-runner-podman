@@ -15,10 +15,11 @@ RUN chmod +x /bin/tmate
   
 WORKDIR /go/src/drone-runner-podman
 
-# ADD go.mod go.sum /go/src/drone-runner-podman/
+ADD go.mod go.sum /go/src/drone-runner-podman/
+
+RUN go mod download
 
 COPY . .
-RUN go mod download
 RUN go build -o drone-runner-podman .
 
 FROM alpine:3
