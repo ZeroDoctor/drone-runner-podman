@@ -11,4 +11,3 @@
 
     podman build -t drone/drone-runner-podman:latest-linux-amd64 -f docker/Dockerfile.linux.amd64 .
     podman build -t drone/drone-runner-podman:latest-linux-arm64 -f docker/Dockerfile.linux.arm64 .
-    podman build -t drone/drone-runner-podman:latest-linux-arm   -f docker/Dockerfile.linux.arm   .

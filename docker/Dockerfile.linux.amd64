@@ -12,7 +12,7 @@ RUN wget https://github.com/tmate-io/tmate/releases/download/2.4.0/tmate-2.4.0-s
 RUN tar -xf tmate-2.4.0-static-linux-amd64.tar.xz
 RUN mv tmate-2.4.0-static-linux-amd64/tmate /bin/
 RUN chmod +x /bin/tmate
-  
+ 
 WORKDIR /go/src/drone-runner-podman
 
 ADD go.mod go.sum /go/src/drone-runner-podman/
@@ -22,7 +22,7 @@ RUN go mod download
 COPY . .
 RUN go build -o drone-runner-podman .
 
-FROM alpine:3
+FROM scratch
 EXPOSE 3000
 
 ENV GODEBUG netdns=go

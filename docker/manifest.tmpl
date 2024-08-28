@@ -17,20 +17,3 @@ manifests:
       variant: v8
       architecture: arm64
       os: linux
-  -
-    image: drone/drone-runner-podman:{{#if build.tag}}{{trimPrefix "v" build.tag}}-{{/if}}linux-ppc64le
-    platform:
-      architecture: ppc64le
-      os: linux
-  -
-    image: drone/drone-runner-podman:{{#if build.tag}}{{trimPrefix "v" build.tag}}-{{/if}}windows-1809-amd64
-    platform:
-      architecture: amd64
-      os: windows
-      version: 1809
-  -
-    image: drone/drone-runner-podman:{{#if build.tag}}{{trimPrefix "v" build.tag}}-{{/if}}windows-ltsc2022-amd64
-    platform:
-      architecture: amd64
-      os: windows
-      version: ltsc2022
