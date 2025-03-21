@@ -168,4 +168,4 @@ require (
 
 replace github.com/containers/storage v1.52.0 => github.com/containers/storage v1.51.0
 
-// replace github.com/docker/docker v25.0.3+incompatible => github.com/docker/docker v24.0.7+incompatible
+replace github.com/docker/docker v25.0.3+incompatible => github.com/docker/docker v24.0.7+incompatible
