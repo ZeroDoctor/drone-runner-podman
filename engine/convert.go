@@ -5,6 +5,7 @@
 package engine
 
 import (
+	"fmt"
 	"io/fs"
 	"net"
 	"strings"
@@ -74,7 +75,7 @@ func toSpec(spec *Spec, step *Step) *specgen.SpecGenerator {
 	}
 
 	resource := specgen.ContainerResourceConfig{}
-	if isUnlimited(step) == false {
+	if !isUnlimited(step) {
 		resource = specgen.ContainerResourceConfig{
 			CPUPeriod: uint64(step.CPUPeriod),
 			CPUQuota:  step.CPUQuota,
@@ -112,15 +113,11 @@ func toLinuxDeviceSlice(spec *Spec, step *Step) []specs.LinuxDevice {
 		if !ok {
 			continue
 		}
-		if isDevice(device) == false {
+		if !isDevice(device) {
 			continue
 		}
 		to = append(to, specs.LinuxDevice{
-			// NOTE: there only host path... weird
-			Path: device.HostPath.Path,
-
-			// PathOnHost:      device.HostPath.Path,
-			// PathInContainer: mount.DevicePath,
+			Path:     device.HostPath.Path,
 			FileMode: toPtr(fs.ModePerm),
 		})
 	}
@@ -191,13 +188,7 @@ func toLinuxMount(source *Volume, target *VolumeMount) specs.Mount {
 	}
 
 	if isTempfs(source) {
-		// NOTE: specs.Mount might not be the right structure
-		//	maybe ImageVolume is suitable here
-
-		// to.TmpfsOptions = &mount.TmpfsOptions{
-		// 	SizeBytes: source.EmptyDir.SizeLimit,
-		// 	Mode:      0700,
-		// }
+		to.Type = fmt.Sprintf("tmpfs,tmpfs-size=%d,tmpfs-mode=0700", source.EmptyDir.SizeLimit)
 	}
 
 	return to
@@ -216,19 +207,6 @@ func toVolumeType(from *Volume) mount.Type {
 	default:
 		return mount.TypeBind
 	}
-}
-
-// helper function that converts a key value map of
-// environment variables to a string slice in key=value
-// format.
-func toEnv(env map[string]string) []string {
-	var envs []string
-	for k, v := range env {
-		if v != "" {
-			envs = append(envs, k+"="+v)
-		}
-	}
-	return envs
 }
 
 // returns true if the container has no resource limits.
