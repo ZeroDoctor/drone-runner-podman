@@ -35,12 +35,14 @@ func flattenToBytes(data []string) []byte {
 type ReaderClose struct {
 	ctx      context.Context
 	channels []chan string
+	closed   bool
 }
 
 func NewChansReadClose(ctx context.Context, channels ...chan string) *ReaderClose {
 	return &ReaderClose{
 		ctx:      ctx,
 		channels: channels,
+		closed:   false,
 	}
 }
 
@@ -55,6 +57,7 @@ func (c *ReaderClose) Read(p []byte) (n int, err error) {
 		select {
 		case <-c.ctx.Done():
 			c.Close()
+			c.closed = true
 			return n, io.EOF
 		default:
 		}
@@ -74,6 +77,10 @@ func (c *ReaderClose) Read(p []byte) (n int, err error) {
 }
 
 func (c *ReaderClose) Close() error {
+	if c.closed {
+		return nil
+	}
+
 	for i := range c.channels {
 		close(c.channels[i])
 	}
