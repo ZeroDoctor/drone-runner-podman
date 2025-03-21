@@ -12,7 +12,6 @@ import (
 
 	"github.com/containers/common/libnetwork/types"
 	"github.com/containers/podman/v4/pkg/specgen"
-	"github.com/docker/docker/api/types/mount"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 )
@@ -149,7 +148,7 @@ func toLinuxVolumeSlice(spec *Spec, step *Step) []*specgen.NamedVolume {
 	return to
 }
 
-// helper function returns a slice of docker mount
+// helper function returns a slice of podman mount
 // configurations.
 func toLinuxVolumeMounts(spec *Spec, step *Step) []specs.Mount {
 	var mounts []specs.Mount
@@ -173,11 +172,11 @@ func toLinuxVolumeMounts(spec *Spec, step *Step) []specs.Mount {
 }
 
 // helper function converts the volume declaration to a
-// docker mount structure.
+// podman mount structure.
 func toLinuxMount(source *Volume, target *VolumeMount) specs.Mount {
 	to := specs.Mount{
 		Destination: target.Path,
-		Type:        string(toVolumeType(source)),
+		Type:        toVolumeType(source),
 	}
 	if isBindMount(source) || isNamedPipe(source) {
 		to.Source = source.HostPath.Path
@@ -194,18 +193,18 @@ func toLinuxMount(source *Volume, target *VolumeMount) specs.Mount {
 	return to
 }
 
-// helper function returns the docker volume enumeration
+// helper function returns the podman volume enumeration
 // for the given volume.
-func toVolumeType(from *Volume) mount.Type {
+func toVolumeType(from *Volume) string {
 	switch {
 	case isDataVolume(from):
-		return mount.TypeVolume
+		return "volume"
 	case isTempfs(from):
-		return mount.TypeTmpfs
+		return "tmpfs"
 	case isNamedPipe(from):
-		return mount.TypeNamedPipe
+		return "npipe"
 	default:
-		return mount.TypeBind
+		return "bind"
 	}
 }
 

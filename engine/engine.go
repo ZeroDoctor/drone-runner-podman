@@ -203,7 +203,7 @@ func (e *Podman) Destroy(ctx context.Context, specv runtime.Spec) error {
 	// notice that we never collect or return any errors.
 	// this is because we silently ignore cleanup failures
 	// and instead ask the system admin to periodically run
-	// `docker prune` commands.
+	// `podman prune` commands.
 	return nil
 }
 
@@ -254,7 +254,7 @@ func (e *Podman) Run(ctx context.Context, specv runtime.Spec, stepv runtime.Step
 }
 
 //
-// emulate docker commands
+// emulate podman commands
 //
 
 func (e *Podman) create(ctx context.Context, spec *Spec, step *Step, output io.Writer) error {
@@ -328,13 +328,13 @@ func (e *Podman) create(ctx context.Context, spec *Spec, step *Step, output io.W
 	return nil
 }
 
-// helper function emulates the `docker start` command.
+// helper function emulates the `podman start` command.
 func (e *Podman) start(ctx context.Context, id string) error {
 	logger.FromContext(ctx).Tracef("starting containers from base function...")
 	return containers.Start(e.conn, id, &containers.StartOptions{})
 }
 
-// helper function emulates the `docker wait` command, blocking
+// helper function emulates the `podman wait` command, blocking
 // until the container stops and returning the exit code.
 func (e *Podman) waitRetry(ctx context.Context, id string) (*runtime.State, error) {
 	for {
@@ -357,7 +357,7 @@ func (e *Podman) waitRetry(ctx context.Context, id string) (*runtime.State, erro
 	}
 }
 
-// helper function emulates the `docker wait` command, blocking
+// helper function emulates the `podman wait` command, blocking
 // until the container stops and returning the exit code.
 func (e *Podman) wait(ctx context.Context, id string) (*runtime.State, error) {
 	logger.FromContext(ctx).
@@ -380,7 +380,7 @@ func (e *Podman) wait(ctx context.Context, id string) (*runtime.State, error) {
 	}, nil
 }
 
-// helper function emulates the `docker logs -f` command, streaming all container logs until the container stops.
+// helper function emulates the `podman logs -f` command, streaming all container logs until the container stops.
 func (e *Podman) deferTail(ctx context.Context, id string, output io.Writer) (logs io.ReadCloser, err error) {
 	opts := containers.LogOptions{
 		Follow:     toPtr(true),
@@ -408,7 +408,7 @@ func (e *Podman) deferTail(ctx context.Context, id string, output io.Writer) (lo
 	return logs, nil
 }
 
-// helper function emulates the `docker logs -f` command, streaming all container logs until the container stops.
+// helper function emulates the `podman logs -f` command, streaming all container logs until the container stops.
 func (e *Podman) tail(ctx context.Context, id string, output io.Writer) error {
 	opts := containers.LogOptions{
 		Follow:     toPtr(true),

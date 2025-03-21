@@ -88,7 +88,7 @@ type Compiler struct {
 	Networks []string
 
 	// NetworkOpts provides a set of network options that
-	// are used when creating the docker network.
+	// are used when creating the podman network.
 	NetworkOpts map[string]string
 
 	// NetrcCloneOnly instructs the compiler to only inject
