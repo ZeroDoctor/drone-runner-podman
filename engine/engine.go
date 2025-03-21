@@ -18,12 +18,12 @@ import (
 	"github.com/drone/runner-go/pipeline/runtime"
 
 	"github.com/containers/common/libnetwork/types"
-	"github.com/containers/podman/v4/pkg/bindings"
-	"github.com/containers/podman/v4/pkg/bindings/containers"
-	"github.com/containers/podman/v4/pkg/bindings/images"
-	"github.com/containers/podman/v4/pkg/bindings/network"
-	"github.com/containers/podman/v4/pkg/bindings/volumes"
-	"github.com/containers/podman/v4/pkg/domain/entities"
+	"github.com/containers/podman/v5/pkg/bindings"
+	"github.com/containers/podman/v5/pkg/bindings/containers"
+	"github.com/containers/podman/v5/pkg/bindings/images"
+	"github.com/containers/podman/v5/pkg/bindings/network"
+	"github.com/containers/podman/v5/pkg/bindings/volumes"
+	"github.com/containers/podman/v5/pkg/domain/entities"
 )
 
 // TODO: figure out what to do about this global

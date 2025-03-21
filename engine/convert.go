@@ -11,22 +11,22 @@ import (
 	"strings"
 
 	"github.com/containers/common/libnetwork/types"
-	"github.com/containers/podman/v4/pkg/specgen"
+	"github.com/containers/podman/v5/pkg/specgen"
 	"github.com/opencontainers/runtime-spec/specs-go"
 	"github.com/sirupsen/logrus"
 )
 
 func toSpec(spec *Spec, step *Step) *specgen.SpecGenerator {
+
 	basic := specgen.ContainerBasicConfig{
-		Name:         step.ID,
-		RawImageName: step.Image,
-		Labels:       step.Labels,
-		Env:          step.Envs,
-		Entrypoint:   step.Entrypoint,
-		Command:      step.Command,
-		Stdin:        false,
-		Terminal:     false,
-		EnvSecrets:   make(map[string]string, 0),
+		Name:       step.ID,
+		Labels:     step.Labels,
+		Env:        step.Envs,
+		Entrypoint: step.Entrypoint,
+		Command:    step.Command,
+		Stdin:      toPtr(false),
+		Terminal:   toPtr(false),
+		EnvSecrets: make(map[string]string, 0),
 	}
 
 	for _, sec := range step.Secrets {
@@ -36,7 +36,7 @@ func toSpec(spec *Spec, step *Step) *specgen.SpecGenerator {
 	volume := specgen.ContainerStorageConfig{
 		Image:            step.Image,
 		WorkDir:          step.WorkingDir,
-		CreateWorkingDir: true,
+		CreateWorkingDir: toPtr(true),
 		ShmSize:          toPtr(step.ShmSize),
 	}
 
@@ -49,7 +49,7 @@ func toSpec(spec *Spec, step *Step) *specgen.SpecGenerator {
 	logrus.Tracef("[has_privileged=%+v]", step.Privileged)
 	security := specgen.ContainerSecurityConfig{
 		User:       step.User,
-		Privileged: step.Privileged,
+		Privileged: toPtr(step.Privileged),
 	}
 
 	var dns []net.IP
@@ -76,10 +76,10 @@ func toSpec(spec *Spec, step *Step) *specgen.SpecGenerator {
 	resource := specgen.ContainerResourceConfig{}
 	if !isUnlimited(step) {
 		resource = specgen.ContainerResourceConfig{
-			CPUPeriod: uint64(step.CPUPeriod),
-			CPUQuota:  step.CPUQuota,
 			ResourceLimits: &specs.LinuxResources{
 				CPU: &specs.LinuxCPU{
+					Period: toPtr(uint64(step.CPUPeriod)),
+					Quota:  toPtr(step.CPUQuota),
 					Cpus:   strings.Join(step.CPUSet, ","),
 					Shares: toPtr(uint64(step.CPUShares)),
 				},
